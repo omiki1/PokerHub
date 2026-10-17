@@ -26,6 +26,18 @@ class PlayIn(BaseModel):
     card: str
 
 
+class DdzBidIn(BaseModel):
+    """斗地主叫分。0 表示不叫，最高 3 分。"""
+
+    score: int = Field(ge=0, le=3)
+
+
+class DdzPlayIn(BaseModel):
+    """斗地主出牌。一次可以出好几张，是不是合法牌型由引擎判断。"""
+
+    cards: list[str] = Field(min_length=1, max_length=20)
+
+
 class DeckIn(BaseModel):
     cards: list[str]
 

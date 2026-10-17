@@ -112,7 +112,7 @@ button:focus-visible, input:focus-visible {
 
 .actions {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin: 22px 0 14px;
 }
@@ -401,9 +401,197 @@ input {
   line-height: 1.55;
 }
 
+/* ---------- 斗地主牌桌 ---------- */
+
+.ddz-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ddz-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(228, 201, 138, 0.22);
+  background: rgba(0, 0, 0, 0.3);
+}
+.ddz-stat span { color: rgba(246, 240, 230, 0.72); font-size: 13px; }
+.ddz-stat b { font-family: Palatino, Georgia, serif; font-size: 20px; }
+.ddz-stat.bright { border-color: var(--gold); }
+
+/* 记牌器：还没露面的牌还剩几张 */
+.ddz-counter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(228, 201, 138, 0.18);
+  background: rgba(0, 0, 0, 0.24);
+}
+.ddz-counter-title {
+  margin-right: 4px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+}
+.counter-chip {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  min-width: 42px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(246, 240, 230, 0.1);
+  font-size: 12px;
+}
+.counter-chip b { font-weight: 650; }
+.counter-chip i {
+  font-style: normal;
+  font-family: Palatino, Georgia, serif;
+  color: var(--gold);
+}
+.counter-chip.gone { opacity: 0.32; text-decoration: line-through; }
+.counter-chip.hot { border-color: rgba(228, 201, 138, 0.45); }
+
+.result { display: grid; gap: 10px; }
+.result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.result-actions span { font-size: 13px; color: rgba(246, 240, 230, 0.72); }
+
+.ddz-felt { display: grid; gap: 14px; }
+.ddz-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ddz-seat {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(228, 201, 138, 0.22);
+  background: rgba(0, 0, 0, 0.26);
+}
+.ddz-seat.live {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(228, 201, 138, 0.45), 0 0 22px rgba(228, 201, 138, 0.16);
+}
+/* 机器人正在想的时候，座位上有一呼一吸的光，看得见它在动 */
+.ddz-seat.thinking { animation: thinking 1.3s ease-in-out infinite; }
+@keyframes thinking {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(228, 201, 138, 0.4), 0 0 18px rgba(228, 201, 138, 0.12); }
+  50% { box-shadow: 0 0 0 1px rgba(228, 201, 138, 0.9), 0 0 30px rgba(228, 201, 138, 0.42); }
+}
+.ddz-seat header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ddz-seat header em, .ddz-mine em {
+  font-style: normal;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  color: rgba(246, 240, 230, 0.82);
+}
+.ddz-seat.landlord header em, .ddz-mine em.landlord {
+  background: linear-gradient(180deg, #f0d7a2, #b5813c);
+  color: #2a2114;
+  border-color: transparent;
+  font-weight: 650;
+}
+.ddz-where { font-size: 12px; color: rgba(246, 240, 230, 0.55); }
+.ddz-meta { margin: 0 0 8px; font-size: 13px; color: rgba(246, 240, 230, 0.72); }
+
+.ddz-play { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ddz-pass {
+  margin: 8px 0 0;
+  color: var(--gold);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips.center { justify-content: center; }
+.chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 42px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: linear-gradient(#fffaf3, #f3e7d4);
+  color: var(--ink);
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 650;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.32);
+}
+.chip.red { color: #a12632; }
+.chip.sm { min-width: 28px; height: 34px; font-size: 13px; }
+.chip.lg { min-width: 42px; height: 56px; font-size: 18px; }
+
+.ddz-center { display: grid; gap: 8px; justify-items: center; }
+.ddz-center > p { margin: 0; font-weight: 650; color: var(--gold); }
+.ddz-top em {
+  display: block;
+  margin-bottom: 6px;
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+}
+.ddz-top { display: grid; justify-items: center; }
+.ddz-free { font-size: 13px; color: rgba(246, 240, 230, 0.72); }
+
+.ddz-controls { margin: 12px 0; }
+.ddz-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ddz-buttons .ghost { margin-top: 0; }
+
+.ddz-mine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+.ddz-mine span { font-size: 13px; color: rgba(246, 240, 230, 0.72); }
+
+.ddz-hand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  min-height: 104px;
+  padding: 22px 0 6px;
+}
+.ddz-hand .card.sm {
+  width: 58px;
+  height: 82px;
+  margin-right: -22px;
+  transition: transform 0.12s ease;
+}
+.ddz-hand .card.sm:last-child { margin-right: 0; }
+/* 轮不到你的时候手牌只是不能点，别灰到看不清 */
+.ddz-hand .card.sm:disabled { opacity: 0.74; }
+.ddz-hand .card.sm:hover:not(:disabled) { transform: translateY(-10px); z-index: 2; }
+.ddz-hand .card.sm.on {
+  transform: translateY(-16px);
+  box-shadow: 0 0 0 3px rgba(228, 201, 138, 0.9);
+  z-index: 3;
+}
+.ddz-hand .card.sm .corner b { font-size: 15px; }
+.ddz-hand .card.sm .pip { font-size: 22px; }
+.card.joker .corner b { font-size: 13px; }
+.card.joker .card.pip, .card.joker .pip { font-size: 20px; }
+.backs .more { align-self: center; font-size: 12px; color: rgba(246, 240, 230, 0.7); }
+
 @media (max-width: 980px) {
   .actions { grid-template-columns: repeat(4, 1fr); }
-  .lobby, .table-layout, .scorebar { grid-template-columns: 1fr; }
+  .lobby, .table-layout, .scorebar, .ddz-seats { grid-template-columns: 1fr; }
   .pitch h2, .empty-table h2 { font-size: 32px; }
   .seat-meta.you { align-items: flex-start; text-align: left; }
   .log { max-height: 220px; }
@@ -418,9 +606,15 @@ input {
   .actions { grid-template-columns: repeat(2, 1fr); }
   .history article { grid-template-columns: 1fr auto; }
   .history em { grid-column: 2; grid-row: 1; }
+  .ddz-hand .card.sm { width: 46px; height: 68px; margin-right: -20px; }
+  .ddz-hand .card.sm .corner b { font-size: 13px; }
+  .ddz-hand .card.sm .pip { font-size: 18px; }
+  .chip.lg { min-width: 34px; height: 46px; font-size: 15px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .embers { display: none; }
   .hand .card:hover:not(:disabled) { transform: none; }
+  .ddz-seat.thinking { animation: none; }
+  .ddz-hand .card.sm { transition: none; }
 }

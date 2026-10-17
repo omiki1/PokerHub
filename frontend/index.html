@@ -30,11 +30,17 @@
     <nav class="actions" aria-label="功能">
       <button type="button" :class="{ on: panel === 'login' }" @click="openPanel('login')">注册登录</button>
       <button type="button" :class="{ on: panel === 'profile' }" @click="openPanel('profile')">个人信息</button>
-      <button type="button" :class="{ on: panel === 'game' }" @click="startSolo">开始游戏</button>
-      <button type="button" :class="{ on: panel === 'match' }" @click="startMatch">房间匹配</button>
       <button type="button" :class="{ on: panel === 'deck' }" @click="openPanel('deck')">牌组管理</button>
       <button type="button" :class="{ on: panel === 'rules' }" @click="openPanel('rules')">规则说明</button>
       <button type="button" :class="{ on: panel === 'history' }" @click="openPanel('history')">历史记录</button>
+      <button type="button" :class="{ on: panel === 'game' }" @click="startSolo">开始游戏</button>
+      <button type="button" :class="{ on: panel === 'match' && waitGame === 'poker' }" @click="startMatch">房间匹配</button>
+      <button type="button" :class="{ on: panel === 'ddz' && ddzMode === 'solo' }" @click="startDdzSolo">斗地主人机</button>
+      <button
+        type="button"
+        :class="{ on: (panel === 'match' && waitGame === 'ddz') || (panel === 'ddz' && ddzMode === 'match') }"
+        @click="startDdzMatch"
+      >斗地主房间</button>
       <button type="button" class="danger" @click="surrender">投降</button>
     </nav>
 
@@ -121,13 +127,20 @@
           <h2>{{ rules.title || '规则说明' }}</h2>
         </div>
       </div>
-      <p>四家花色只是旧日的名字。比大小时花色不作数，先得到三分的人离开牌桌。</p>
-      <ul class="houses houses-inline">
-        <li><b>♠</b>黑棘</li>
-        <li><b class="hot">♥</b>赤焰</li>
-        <li><b class="hot">♦</b>星晶</li>
-        <li><b>♣</b>森誓</li>
-      </ul>
+      <div class="switch">
+        <button type="button" :class="{ on: rulesGame === 'poker' }" @click="showRules('poker')">抽牌比点</button>
+        <button type="button" :class="{ on: rulesGame === 'ddz' }" @click="showRules('ddz')">斗地主</button>
+      </div>
+      <template v-if="rulesGame === 'poker'">
+        <p>四家花色只是旧日的名字。比大小时花色不作数，先得到三分的人离开牌桌。</p>
+        <ul class="houses houses-inline">
+          <li><b>♠</b>黑棘</li>
+          <li><b class="hot">♥</b>赤焰</li>
+          <li><b class="hot">♦</b>星晶</li>
+          <li><b>♣</b>森誓</li>
+        </ul>
+      </template>
+      <p v-else>一副 54 张，三个人打。地主一个人一方，另外两个农民一方。</p>
       <ol class="rules">
         <li v-for="(line, index) in rules.lines" :key="index">{{ line }}</li>
       </ol>
@@ -147,7 +160,8 @@
             <b>{{ loreName(row.opponent_name) }}</b>
             <span>{{ row.created_at }} · {{ row.mode }}</span>
           </div>
-          <div class="score-pair">{{ row.my_score }} : {{ row.opp_score }}</div>
+          <div class="score-pair" v-if="row.game === 'ddz'">{{ signed(row.my_score - row.opp_score) }} 分</div>
+          <div class="score-pair" v-else>{{ row.my_score }} : {{ row.opp_score }}</div>
           <em :class="row.result === '胜' ? 'good' : 'bad'">{{ row.result }}</em>
           <p>{{ loreLine(row.reason) }}</p>
         </article>
@@ -157,13 +171,162 @@
     <section v-else-if="panel === 'match'" class="panel sheet-page">
       <div class="page-head">
         <div>
-          <p class="kicker">两位玩家</p>
+          <p class="kicker">{{ waitGame === 'ddz' ? '三位玩家' : '两位玩家' }}</p>
           <h2>房间匹配</h2>
         </div>
       </div>
-      <p>两位已登录的玩家会配到同一局。只有一个人时，会停在这里等待。</p>
-      <p class="wait" v-if="waiting">正在等待另一位玩家…</p>
+      <p v-if="waitGame === 'ddz'">斗地主需要三位已登录的玩家。人不够就会停在这里等待。</p>
+      <p v-else>两位已登录的玩家会配到同一局。只有一个人时，会停在这里等待。</p>
+      <p class="wait" v-if="waiting">{{ waitText }}</p>
       <button type="button" class="ghost" :disabled="!waiting" @click="cancelMatch">取消等待</button>
+    </section>
+
+    <section v-else-if="panel === 'ddz'" class="panel table-panel">
+      <div v-if="!ddz" class="empty-table">
+        <p class="kicker">三缺一</p>
+        <h2>斗地主还差人。</h2>
+        <p>点「斗地主人机」和两位看守打一局，或点「斗地主房间」等第三位旅人。</p>
+      </div>
+      <template v-else>
+        <div class="table-layout">
+          <div>
+            <div class="ddz-bar">
+              <div class="ddz-stat"><span>玩法</span><b>{{ ddz.mode === 'solo' ? '人机' : '匹配' }}</b></div>
+              <div class="ddz-stat"><span>底分</span><b>{{ ddz.base }}</b></div>
+              <div class="ddz-stat"><span>倍数</span><b>{{ ddz.multiplier }}</b></div>
+              <div class="ddz-stat"><span>炸弹</span><b>{{ ddz.bombs }}</b></div>
+              <div class="ddz-stat" :class="{ bright: !ddz.bottom_hidden }">
+                <span>底牌</span>
+                <span class="chips" v-if="!ddz.bottom_hidden">
+                  <i v-for="card in ddz.bottom" :key="card" class="chip sm" :class="{ red: ddzRed(card) }">{{ ddzRank(card) }}</i>
+                </span>
+                <b v-else>?</b>
+              </div>
+            </div>
+
+            <div class="ddz-counter" aria-label="记牌器">
+              <span class="ddz-counter-title">记牌器</span>
+              <span
+                v-for="row in ddz.remaining"
+                :key="row.rank"
+                class="counter-chip"
+                :class="{ gone: row.left === 0, hot: row.left > 0 && row.left === row.total }"
+              >
+                <b>{{ row.rank }}</b><i>{{ row.left }}</i>
+              </span>
+            </div>
+
+            <div class="felt ddz-felt">
+              <div class="ddz-seats">
+                <article
+                  v-for="rival in ddz.others"
+                  :key="rival.seat"
+                  class="ddz-seat"
+                  :class="{
+                    live: rival.is_turn || rival.is_bid_turn,
+                    landlord: rival.is_landlord,
+                    thinking: ddz.bot_thinking && (rival.is_turn || rival.is_bid_turn),
+                  }"
+                >
+                  <header>
+                    <b>{{ loreName(rival.name) }}</b>
+                    <em>{{ rival.is_landlord ? '地主' : '农民' }}</em>
+                    <span class="ddz-where">{{ rival.side === 'right' ? '下家' : '上家' }}</span>
+                  </header>
+                  <p class="ddz-meta">
+                    手牌 {{ rival.hand_count }} 张
+                    <template v-if="rival.bid !== null"> · 叫 {{ rival.bid }} 分</template>
+                  </p>
+                  <div class="backs">
+                    <i v-for="n in Math.min(rival.hand_count, 8)" :key="n"></i>
+                    <span class="more" v-if="rival.hand_count > 8">+{{ rival.hand_count - 8 }}</span>
+                  </div>
+                  <div class="ddz-play" v-if="rival.last_play.length">
+                    <i v-for="card in rival.last_play" :key="card" class="chip" :class="{ red: ddzRed(card) }">{{ ddzRank(card) }}</i>
+                  </div>
+                  <p class="ddz-pass" v-else-if="rival.passed">不出</p>
+                </article>
+              </div>
+
+              <div class="center ddz-center">
+                <p>{{ ddzCaption }}</p>
+                <div class="ddz-top" v-if="ddz.top">
+                  <em>要压的牌 · {{ ddz.top.label }}{{ ddz.top.by_you ? '（你出的）' : '' }}</em>
+                  <div class="chips">
+                    <i v-for="card in ddz.top.cards" :key="card" class="chip lg" :class="{ red: ddzRed(card) }">{{ ddzRank(card) }}</i>
+                  </div>
+                </div>
+                <p class="ddz-free" v-else-if="ddz.phase === 'playing'">新一轮，这一手可以随便出</p>
+              </div>
+            </div>
+
+            <div class="result" v-if="ddz.phase === 'finished'">
+              <p class="banner" :class="ddz.result.you_win ? 'win' : 'lose'">
+                {{ ddz.result.you_win ? '你赢了。' : '你输了。' }}{{ ddz.result.reason }}（{{ signed(ddz.result.score) }} 分）
+              </p>
+              <div class="result-actions">
+                <button type="button" class="solid" :disabled="rematchWaiting" @click="rematchDdz">再来一局</button>
+                <span v-if="rematchWaiting">{{ ddz.mode === 'match' ? '等其他人点头…' : '正在开新的一局…' }}</span>
+              </div>
+            </div>
+
+            <div class="ddz-controls" v-if="ddz.phase === 'bidding'">
+              <p class="turn live" v-if="ddz.you.is_bid_turn">轮到你叫分。叫得最高的人当地主，叫到的分就是底分。</p>
+              <p class="turn" v-else>等待别的旅人叫分…</p>
+              <div class="ddz-buttons" v-if="ddz.you.is_bid_turn">
+                <button type="button" class="ghost" @click="ddzBid(0)">不叫</button>
+                <button
+                  v-for="n in 3"
+                  :key="n"
+                  type="button"
+                  class="solid"
+                  :disabled="n <= ddz.bid_high"
+                  @click="ddzBid(n)"
+                >{{ n }} 分</button>
+              </div>
+            </div>
+
+            <div class="ddz-controls" v-else-if="ddz.phase === 'playing'">
+              <p class="turn live" v-if="ddz.you.is_turn">轮到你出牌。点手牌选牌，再点「出牌」。</p>
+              <p class="turn" v-else>等待别的旅人出牌。胜负由服务器判定。</p>
+              <div class="ddz-buttons">
+                <button type="button" class="solid" :disabled="!ddz.you.is_turn || !ddzSelection.length" @click="ddzPlay">出牌</button>
+                <button type="button" class="ghost" :disabled="!ddz.you.is_turn || !ddz.top" @click="ddzPass">不出</button>
+                <button type="button" class="ghost" :disabled="!ddz.you.is_turn" @click="ddzHint">提示</button>
+                <button type="button" class="ghost" :disabled="!ddzSelection.length" @click="ddzClear">清空</button>
+              </div>
+            </div>
+
+            <p class="ddz-mine">
+              <b>{{ loreName(ddz.you.name) }}</b>
+              <em :class="{ landlord: ddz.you.is_landlord }">{{ ddz.you.is_landlord ? '地主' : '农民' }}</em>
+              <span>手牌 {{ ddz.you.hand_count }} 张</span>
+              <span v-if="ddz.you.bid !== null"> · 叫 {{ ddz.you.bid }} 分</span>
+            </p>
+            <div class="ddz-hand">
+              <button
+                v-for="card in ddzHand"
+                :key="card"
+                type="button"
+                class="card sm"
+                :class="{ red: ddzRed(card), on: ddzSelection.includes(card), joker: ddzJoker(card) }"
+                :disabled="!ddz.you.is_turn || ddz.phase !== 'playing'"
+                @click="ddzToggle(card)"
+              >
+                <span class="corner"><b>{{ ddzCorner(card) }}</b><i>{{ ddzSuit(card) }}</i></span>
+                <span class="pip" aria-hidden="true">{{ ddzSuit(card) }}</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="log-card">
+            <h2>对局记录</h2>
+            <ol class="log">
+              <li v-for="(line, index) in ddz.log" :key="index">{{ loreLine(line) }}</li>
+            </ol>
+          </aside>
+        </div>
+      </template>
     </section>
 
     <section v-else class="panel table-panel">
@@ -225,8 +388,15 @@
               </div>
             </div>
 
-            <p class="banner win" v-if="game.status === 'finished' && game.winner === 'you'">你赢了。{{ game.reason }}</p>
-            <p class="banner lose" v-if="game.status === 'finished' && game.winner === 'opponent'">你输了。{{ game.reason }}</p>
+            <div class="result" v-if="game.status === 'finished'">
+              <p class="banner" :class="game.winner === 'you' ? 'win' : 'lose'">
+                {{ game.winner === 'you' ? '你赢了。' : '你输了。' }}{{ game.reason }}
+              </p>
+              <div class="result-actions">
+                <button type="button" class="solid" :disabled="rematchWaiting" @click="rematchPoker">再来一局</button>
+                <span v-if="rematchWaiting">等人点头…</span>
+              </div>
+            </div>
             <p class="turn live" v-else-if="game.you.is_turn">轮到你：可以先抓一张，再点手牌打出。</p>
             <p class="turn" v-else>等待对手出牌。胜负由服务器判定。</p>
 

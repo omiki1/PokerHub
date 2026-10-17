@@ -67,6 +67,59 @@ def register(client: TestClient, username: str) -> str:
     return response.json()["token"]
 
 
+def check_rematch(client: TestClient) -> None:
+    """打完一局点「再来一局」。人机局自己说了算，匹配局要两个人都点头。"""
+    token = register(client, "rematch_solo")
+    with client.websocket_connect("/ws") as socket:
+        socket.send_json({"type": "hello", "token": token})
+        expect(socket.receive_json()["type"] == "ready", "登录失败")
+        socket.send_json({"type": "start_solo"})
+        expect(socket.receive_json()["type"] == "state", "人机局没开起来")
+        socket.send_json({"type": "surrender"})
+        expect(socket.receive_json()["winner"] == "opponent", "投降应该判负")
+
+        socket.send_json({"type": "rematch"})
+        fresh = socket.receive_json()
+        expect(fresh["type"] == "state", "再来一局应该直接开新局")
+        expect(fresh["status"] == "playing", "新局应该正在打")
+        expect(fresh["winner"] is None, "新局不该带着上一局的结果")
+        socket.send_json({"type": "surrender"})
+        socket.receive_json()
+
+    tokens = [register(client, name) for name in ("rematch_a", "rematch_b")]
+    with client.websocket_connect("/ws") as left, client.websocket_connect("/ws") as right:
+        for socket, token in zip((left, right), tokens):
+            socket.send_json({"type": "hello", "token": token})
+            expect(socket.receive_json()["type"] == "ready", "有人登录失败")
+
+        left.send_json({"type": "start_match"})
+        expect(left.receive_json()["type"] == "waiting", "第一个人应该先排队")
+        right.send_json({"type": "start_match"})
+        expect(left.receive_json()["mode"] == "match", "没有配成一局")
+        expect(right.receive_json()["mode"] == "match", "没有配成一局")
+
+        left.send_json({"type": "surrender"})
+        expect(left.receive_json()["winner"] == "opponent", "投降的一方判负")
+        expect(right.receive_json()["winner"] == "you", "对面投降应该获胜")
+
+        # 一个人点头不算数
+        left.send_json({"type": "rematch"})
+        waiting = left.receive_json()
+        expect(waiting["type"] == "rematch_waiting", "一个人点头时应该等对面")
+        expect(waiting["have"] == 1 and waiting["need"] == 2, "进度应该是 1/2")
+        expect(right.receive_json()["type"] == "rematch_waiting", "另一个人也该看到进度")
+
+        # 两个人都点头才开新局
+        right.send_json({"type": "rematch"})
+        left_again = left.receive_json()
+        right_again = right.receive_json()
+        expect(left_again["type"] == "state" and left_again["status"] == "playing", "两个人都点头就该开新局")
+        expect(right_again["type"] == "state", "另一个人也该收到新局")
+        expect(left_again["winner"] is None, "新局不该带着上一局的结果")
+        expect(right_again["you"]["score"] == 0, "新局比分应该清零")
+    print("再来一局通过：人机局直接开，匹配局要两个人都点头。")
+
+
 def main() -> None:
     with TestClient(app) as client:
         expect(client.get("/api/health").json()["ok"] is True, "健康检查失败")
@@ -161,6 +214,8 @@ def main() -> None:
         client.post("/api/logout", headers=headers)
         hidden = client.get("/api/me", headers=headers)
         expect(hidden.status_code == 401, "退出后旧令牌还能用")
+
+        check_rematch(client)
 
     print("接口自检通过。")
 

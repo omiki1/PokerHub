@@ -1,6 +1,10 @@
 // 网页只负责显示和提交动作。
 // 能不能出牌、这一回合谁得分、整局谁赢，都等服务器的 WebSocket 消息。
+// 抽牌比点和斗地主共用这一份代码：牌局状态分别放在 game 和 ddz 里。
 const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" };
+
+// 斗地主的点数：3 最小，2 比 A 大，大小王最大。
+const DDZ_POINT = { J: 11, Q: 12, K: 13, A: 14, "2": 15, BJ: 16, RJ: 17 };
 
 const { createApp } = Vue;
 
@@ -15,14 +19,24 @@ createApp({
       message: "",
       messageBad: false,
       rules: { title: "", lines: [] },
+      rulesGame: "poker",
       catalog: [],
       selected: [],
       history: [],
       game: null,
       guestPlayId: "",
       waiting: false,
+      waitGame: "poker",
       ws: null,
       connecting: null,
+      // 斗地主
+      ddz: null,
+      ddzPlayId: "",
+      ddzSelection: [],
+      ddzHintOptions: [],
+      ddzHintIndex: 0,
+      ddzTimer: null,
+      rematchWaiting: false,
     };
   },
 
@@ -51,6 +65,29 @@ createApp({
         };
       }
       return { you: null, opponent: null, caption: "等待出牌" };
+    },
+    ddzHand() {
+      if (!this.ddz) return [];
+      // 大牌放右边，和牌桌上的习惯一致。
+      return this.ddz.you.hand.slice().sort((a, b) => this.ddzPoint(b) - this.ddzPoint(a));
+    },
+    ddzMode() {
+      return this.ddz ? this.ddz.mode : "";
+    },
+    ddzCaption() {
+      const game = this.ddz;
+      if (!game) return "";
+      if (game.phase === "finished") return game.result.reason;
+      const rival = game.others.find((item) => item.is_turn || item.is_bid_turn);
+      const who = game.you.is_turn || game.you.is_bid_turn ? "你" : this.loreName(rival ? rival.name : "");
+      if (game.phase === "bidding") {
+        return who === "你" ? "轮到你叫分" : `${who} 正在叫分…`;
+      }
+      return who === "你" ? "轮到你出牌" : `${who} 正在想…`;
+    },
+    waitText() {
+      if (this.waitGame === "ddz") return "正在等第三位旅人…";
+      return "正在等待另一位玩家…";
     },
   },
 
@@ -104,10 +141,16 @@ createApp({
 
     async loadRules() {
       try {
-        this.rules = await this.api("/api/rules");
+        const path = this.rulesGame === "ddz" ? "/api/rules/ddz" : "/api/rules";
+        this.rules = await this.api(path);
       } catch (error) {
         this.note(error.message, true);
       }
+    },
+
+    async showRules(game) {
+      this.rulesGame = game;
+      await this.loadRules();
     },
 
     async openPanel(name) {
@@ -156,6 +199,11 @@ createApp({
       this.token = "";
       this.user = null;
       this.game = null;
+      this.ddz = null;
+      this.ddzPlayId = "";
+      this.ddzSelection = [];
+      this.rematchWaiting = false;
+      this.stopDdzTimer();
       this.waiting = false;
       localStorage.removeItem("pokerhub_token");
       if (this.ws) this.ws.close();
@@ -261,6 +309,7 @@ createApp({
       if (message.type === "ready") return;
       if (message.type === "waiting") {
         this.waiting = true;
+        this.waitGame = message.game === "ddz" ? "ddz" : "poker";
         this.panel = "match";
         this.note(message.message);
         return;
@@ -274,9 +323,23 @@ createApp({
         this.note(message.message, true);
         return;
       }
+      if (message.type === "rematch_waiting") {
+        this.rematchWaiting = true;
+        this.note(message.message);
+        return;
+      }
       if (message.type === "state") {
         this.guestPlayId = "";
         this.applyState(message);
+        return;
+      }
+      if (message.type === "ddz_state") {
+        this.ddzPlayId = "";
+        this.applyDdz(message);
+        return;
+      }
+      if (message.type === "hint") {
+        this.applyHint(message.options);
       }
     },
 
@@ -285,7 +348,237 @@ createApp({
       this.game = state;
       this.panel = "game";
       this.message = "";
+      this.rematchWaiting = false;
       if (state.status === "finished" && this.user) this.loadHistory();
+    },
+
+    // ----- 斗地主 -----
+
+    applyDdz(state, focus = true) {
+      this.waiting = false;
+      this.ddz = state;
+      // focus 为 false 时不抢界面：免登录局的机器人是网页自己在催，
+      // 玩家翻到规则页或历史页看东西时，不该被硬拉回牌桌。
+      if (focus) this.panel = "ddz";
+      this.message = "";
+      this.rematchWaiting = false;
+      // 出掉的牌要从选中的牌里去掉；轮不到自己就清空。
+      this.ddzSelection = this.ddzSelection.filter((card) => state.you.hand.includes(card));
+      this.ddzHintOptions = [];
+      this.ddzHintIndex = 0;
+      if (state.phase !== "playing" || !state.you.is_turn) this.ddzSelection = [];
+      if (state.phase === "finished" && this.user) this.loadHistory();
+      this.scheduleDdzAdvance();
+    },
+
+    stopDdzTimer() {
+      if (this.ddzTimer) {
+        clearTimeout(this.ddzTimer);
+        this.ddzTimer = null;
+      }
+    },
+
+    scheduleDdzAdvance() {
+      // 免登录的时候没有 WebSocket，机器人由网页停一下催一次。
+      // 不这么做的话，我一出完牌，两个机器人立刻跟着出，牌桌上什么都看不清。
+      this.stopDdzTimer();
+      const state = this.ddz;
+      if (!this.ddzPlayId || !state || state.phase === "finished") return;
+      if (state.you.is_turn || state.you.is_bid_turn) return;
+      const pause = Math.max(60, (state.bot_pause || 1) * 1000);
+      this.ddzTimer = setTimeout(async () => {
+        this.ddzTimer = null;
+        try {
+          const next = await this.api("/api/test/ddz/" + this.ddzPlayId + "/advance", { method: "POST" });
+          this.applyDdz(next, false);
+        } catch (error) {
+          this.note(error.message, true);
+        }
+      }, pause);
+    },
+
+    applyHint(options) {
+      this.ddzHintOptions = options || [];
+      if (!this.ddzHintOptions.length) {
+        this.ddzSelection = [];
+        this.note("没有能压过的牌，只能点「不出」", true);
+        return;
+      }
+      // 连着点「提示」就在几种打法之间轮着换。
+      const option = this.ddzHintOptions[this.ddzHintIndex % this.ddzHintOptions.length];
+      this.ddzHintIndex = (this.ddzHintIndex + 1) % this.ddzHintOptions.length;
+      this.ddzSelection = option.cards.slice();
+      this.note("提示：" + option.label);
+    },
+
+    ddzPoint(card) {
+      if (card === "BJ" || card === "RJ") return DDZ_POINT[card];
+      return DDZ_POINT[card.slice(1)] || Number(card.slice(1));
+    },
+    ddzRank(card) {
+      if (card === "BJ") return "小王";
+      if (card === "RJ") return "大王";
+      return card.slice(1);
+    },
+    // 手牌左上角位置很窄，大小王只写「小」「大」，下面配个「王」字。
+    ddzCorner(card) {
+      if (card === "BJ") return "小";
+      if (card === "RJ") return "大";
+      return card.slice(1);
+    },
+    ddzSuit(card) {
+      if (card === "BJ" || card === "RJ") return "王";
+      return SUIT[card[0]] || card[0];
+    },
+    ddzRed(card) {
+      return card === "RJ" || card[0] === "H" || card[0] === "D";
+    },
+    ddzJoker(card) {
+      return card === "BJ" || card === "RJ";
+    },
+    signed(value) {
+      return value > 0 ? "+" + value : String(value);
+    },
+
+    async startDdzSolo() {
+      this.panel = "ddz";
+      this.message = "";
+      this.ddzSelection = [];
+      this.stopDdzTimer();
+      try {
+        if (this.user) {
+          this.ddzPlayId = "";
+          await this.send({ type: "ddz_solo" });
+          return;
+        }
+        const state = await this.api("/api/test/ddz", { method: "POST" });
+        this.ddzPlayId = state.play_id;
+        this.applyDdz(state);
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    async startDdzMatch() {
+      if (!this.requireLogin()) return;
+      this.panel = "match";
+      this.waitGame = "ddz";
+      try {
+        await this.send({ type: "ddz_match" });
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    async ddzAct(payload) {
+      if (this.ddzPlayId) {
+        let path = "/api/test/ddz/" + this.ddzPlayId;
+        let body;
+        if (payload.type === "ddz_bid") {
+          path += "/bid";
+          body = JSON.stringify({ score: payload.score });
+        } else if (payload.type === "ddz_play") {
+          path += "/play";
+          body = JSON.stringify({ cards: payload.cards });
+        } else if (payload.type === "ddz_pass") {
+          path += "/pass";
+        } else {
+          path += "/surrender";
+        }
+        this.applyDdz(await this.api(path, { method: "POST", body }));
+        return;
+      }
+      await this.send(payload);
+    },
+
+    async ddzBid(score) {
+      this.ddzSelection = [];
+      try {
+        await this.ddzAct({ type: "ddz_bid", score });
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    async ddzPlay() {
+      if (!this.ddzSelection.length) {
+        this.note("先点手牌选牌", true);
+        return;
+      }
+      const cards = this.ddzSelection.slice();
+      try {
+        await this.ddzAct({ type: "ddz_play", cards });
+        this.ddzSelection = [];
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    async ddzPass() {
+      this.ddzSelection = [];
+      try {
+        await this.ddzAct({ type: "ddz_pass" });
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    async ddzHint() {
+      try {
+        if (this.ddzPlayId) {
+          const data = await this.api("/api/test/ddz/" + this.ddzPlayId + "/hint", { method: "POST" });
+          this.applyHint(data.options);
+          return;
+        }
+        await this.send({ type: "ddz_hint" });
+      } catch (error) {
+        this.note(error.message, true);
+      }
+    },
+
+    ddzToggle(card) {
+      if (!this.ddz || this.ddz.phase !== "playing" || !this.ddz.you.is_turn) return;
+      const index = this.ddzSelection.indexOf(card);
+      if (index >= 0) this.ddzSelection.splice(index, 1);
+      else this.ddzSelection.push(card);
+    },
+
+    ddzClear() {
+      this.ddzSelection = [];
+    },
+
+    // 打完一局之后一键再来。人机局自己说了算，匹配局要大家都点头。
+    async rematchDdz() {
+      this.ddzSelection = [];
+      this.ddzHintOptions = [];
+      try {
+        if (this.ddzPlayId) {
+          await this.startDdzSolo();
+          return;
+        }
+        this.rematchWaiting = true;
+        this.note(this.ddz && this.ddz.mode === "match" ? "已点头，等其他人…" : "正在开新的一局…");
+        await this.send({ type: "ddz_rematch" });
+      } catch (error) {
+        this.rematchWaiting = false;
+        this.note(error.message, true);
+      }
+    },
+
+    async rematchPoker() {
+      try {
+        if (this.guestPlayId) {
+          this.rematchWaiting = false;
+          await this.startSolo();
+          return;
+        }
+        this.rematchWaiting = true;
+        this.note(this.game && this.game.mode === "match" ? "已点头，等对面…" : "正在开新的一局…");
+        await this.send({ type: "rematch" });
+      } catch (error) {
+        this.rematchWaiting = false;
+        this.note(error.message, true);
+      }
     },
 
     async act(payload) {
@@ -332,7 +625,7 @@ createApp({
 
     async cancelMatch() {
       try {
-        await this.send({ type: "cancel_match" });
+        await this.send({ type: this.waitGame === "ddz" ? "ddz_cancel_match" : "cancel_match" });
       } catch (error) {
         this.note(error.message, true);
       }
@@ -355,13 +648,22 @@ createApp({
     },
 
     async surrender() {
-      if (!this.game || this.game.status !== "playing") {
+      // 这个按钮两种玩法共用，看现在坐在哪张桌子上。
+      const inDdz = this.panel === "ddz" && this.ddz && this.ddz.phase !== "finished";
+      const inPoker = this.panel !== "ddz" && this.game && this.game.status === "playing";
+      if (!inDdz && !inPoker) {
         this.note("当前没有进行中的对局", true);
         return;
       }
-      if (!window.confirm("确定投降？这局会记为失败。")) return;
+      const words = inDdz ? "确定认输？这一局会记为失败。" : "确定投降？这局会记为失败。";
+      if (!window.confirm(words)) return;
       try {
-        await this.act({ type: "surrender" });
+        if (inDdz) {
+          this.ddzSelection = [];
+          await this.ddzAct({ type: "ddz_surrender" });
+        } else {
+          await this.act({ type: "surrender" });
+        }
       } catch (error) {
         this.note(error.message, true);
       }
