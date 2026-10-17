@@ -367,6 +367,14 @@ createApp({
       }
     },
 
+    loreName(name) {
+      if (name === "电脑") return "灰烬看守";
+      if (name === "游客") return "无名旅人";
+      return name;
+    },
+    loreLine(line) {
+      return String(line).replaceAll("电脑", "灰烬看守").replaceAll("游客", "无名旅人");
+    },
     suitSymbol(suit) {
       return SUIT[suit] || suit;
     },

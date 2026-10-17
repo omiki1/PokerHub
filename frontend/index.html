@@ -3,187 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PokerHub 初级 Demo</title>
+  <title>灰烬圣约 · PokerHub</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <div class="embers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   <div id="app" v-cloak>
     <header class="top">
-      <div>
-        <p class="eyebrow">FastAPI · Vue 3 · WebSocket</p>
-        <h1>PokerHub 初级 Demo</h1>
+      <div class="brand">
+        <img class="sigil" src="/art/sigil.jpg" alt="">
+        <div>
+          <p class="eyebrow">灰烬圣约</p>
+          <h1>PokerHub</h1>
+        </div>
       </div>
-      <p class="who" v-if="user">{{ user.nickname }} · {{ user.wins }} 胜 {{ user.losses }} 负</p>
-      <p class="who" v-else>游客 · 人机免登录</p>
+      <p class="who" v-if="user">
+        <b>{{ user.nickname }}</b>
+        <span>{{ user.wins }} 胜 {{ user.losses }} 负</span>
+      </p>
+      <p class="who guest" v-else>
+        <b>无名旅人</b>
+        <span>尚未立誓 · 可直接入局</span>
+      </p>
     </header>
 
     <nav class="actions" aria-label="功能">
-      <button type="button" @click="openPanel('login')">注册登录</button>
-      <button type="button" @click="openPanel('profile')">个人信息</button>
-      <button type="button" @click="startSolo">开始游戏</button>
-      <button type="button" @click="startMatch">房间匹配</button>
-      <button type="button" @click="openPanel('deck')">牌组管理</button>
-      <button type="button" @click="openPanel('rules')">规则说明</button>
-      <button type="button" @click="openPanel('history')">历史记录</button>
+      <button type="button" :class="{ on: panel === 'login' }" @click="openPanel('login')">注册登录</button>
+      <button type="button" :class="{ on: panel === 'profile' }" @click="openPanel('profile')">个人信息</button>
+      <button type="button" :class="{ on: panel === 'game' }" @click="startSolo">开始游戏</button>
+      <button type="button" :class="{ on: panel === 'match' }" @click="startMatch">房间匹配</button>
+      <button type="button" :class="{ on: panel === 'deck' }" @click="openPanel('deck')">牌组管理</button>
+      <button type="button" :class="{ on: panel === 'rules' }" @click="openPanel('rules')">规则说明</button>
+      <button type="button" :class="{ on: panel === 'history' }" @click="openPanel('history')">历史记录</button>
       <button type="button" class="danger" @click="surrender">投降</button>
     </nav>
 
     <p class="note" :class="{ bad: messageBad }" v-if="message">{{ message }}</p>
 
-    <section v-if="panel === 'login'" class="panel">
-      <h2>{{ authMode === 'login' ? '登录' : '注册' }}</h2>
-      <p>不注册也可以和电脑打。匹配、改牌组和历史记录需要账号。</p>
-      <button type="button" @click="startSolo">免登录，和电脑打一局</button>
-      <p v-if="user">当前账号是 {{ user.nickname }}（{{ user.username }}）。</p>
-      <div class="switch">
-        <button type="button" :class="{ on: authMode === 'login' }" @click="authMode = 'login'">登录</button>
-        <button type="button" :class="{ on: authMode === 'register' }" @click="authMode = 'register'">注册</button>
+    <section v-if="panel === 'login'" class="panel lobby">
+      <div class="pitch">
+        <p class="kicker">第一夜</p>
+        <h2>先得三分，才能活过这一夜。</h2>
+        <p>千年前，灰烬王庭把命运封进四色牌。黑棘、赤焰、星晶、森誓四家已灭，只留下一条规矩。</p>
+        <p>你是未经加冕的旅人。对面坐着灰烬看守。发牌、判牌和胜负都由誓约裁定。</p>
+        <ul class="houses">
+          <li><b>♠</b>黑棘</li>
+          <li><b class="hot">♥</b>赤焰</li>
+          <li><b class="hot">♦</b>星晶</li>
+          <li><b>♣</b>森誓</li>
+        </ul>
+        <button type="button" class="solid" @click="startSolo">免登录，和电脑打一局</button>
       </div>
-      <form @submit.prevent="submitAuth">
-        <label>用户名<input v-model.trim="form.username" maxlength="16" autocomplete="username" required></label>
-        <label>密码<input v-model="form.password" type="password" maxlength="32" autocomplete="current-password" required></label>
-        <button type="submit">{{ authMode === 'login' ? '登录' : '注册并进入' }}</button>
-      </form>
-      <button v-if="user" type="button" class="ghost" @click="logout">退出登录</button>
+      <div class="sheet">
+        <h2>{{ authMode === 'login' ? '登录' : '注册' }}</h2>
+        <p v-if="user">当前账号是 {{ user.nickname }}（{{ user.username }}）。</p>
+        <div class="switch">
+          <button type="button" :class="{ on: authMode === 'login' }" @click="authMode = 'login'">登录</button>
+          <button type="button" :class="{ on: authMode === 'register' }" @click="authMode = 'register'">注册</button>
+        </div>
+        <form @submit.prevent="submitAuth">
+          <label>用户名<input v-model.trim="form.username" maxlength="16" autocomplete="username" required></label>
+          <label>密码<input v-model="form.password" type="password" maxlength="32" autocomplete="current-password" required></label>
+          <button type="submit" class="solid">{{ authMode === 'login' ? '登录' : '注册并进入' }}</button>
+        </form>
+        <button v-if="user" type="button" class="ghost" @click="logout">退出登录</button>
+      </div>
     </section>
 
-    <section v-else-if="panel === 'profile'" class="panel">
-      <h2>个人信息</h2>
+    <section v-else-if="panel === 'profile'" class="panel sheet-page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">账号</p>
+          <h2>个人信息</h2>
+        </div>
+      </div>
       <p>用户名 {{ user.username }}，不能修改。战绩来自已经结束的对局。</p>
+      <div class="stats">
+        <div><b>{{ user.wins }}</b><span>胜</span></div>
+        <div><b>{{ user.losses }}</b><span>负</span></div>
+      </div>
       <form @submit.prevent="saveProfile">
         <label>昵称<input v-model.trim="form.nickname" maxlength="16" required></label>
-        <button type="submit">保存昵称</button>
+        <button type="submit" class="solid">保存昵称</button>
       </form>
-      <p class="stat">{{ user.wins }} 胜 · {{ user.losses }} 负</p>
     </section>
 
-    <section v-else-if="panel === 'deck'" class="panel">
-      <h2>牌组管理</h2>
+    <section v-else-if="panel === 'deck'" class="panel sheet-page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">下一局生效</p>
+          <h2>牌组管理</h2>
+        </div>
+        <p class="count" :class="{ ready: selected.length === 10 }">{{ selected.length }}<small>/ 10</small></p>
+      </div>
       <p>点选正好 10 张。保存后从下一局开始用新牌组，当前这一局不会换牌。</p>
-      <p class="stat">已选 {{ selected.length }} / 10</p>
       <div class="catalog">
         <button
           v-for="card in catalog"
           :key="card.code"
           type="button"
-          class="mini"
+          class="card mini"
           :class="{ red: card.red, on: selected.includes(card.code) }"
+          :aria-pressed="selected.includes(card.code) ? 'true' : 'false'"
           @click="toggleCard(card.code)"
         >
-          <span>{{ card.rank }}</span>
-          <em>{{ suitSymbol(card.suit) }}</em>
+          <span class="corner"><b>{{ card.rank }}</b><i>{{ suitSymbol(card.suit) }}</i></span>
+          <span class="pip" aria-hidden="true">{{ suitSymbol(card.suit) }}</span>
         </button>
       </div>
-      <button type="button" @click="saveDeck">保存牌组</button>
+      <button type="button" class="solid" @click="saveDeck">保存牌组</button>
     </section>
 
-    <section v-else-if="panel === 'rules'" class="panel">
-      <h2>{{ rules.title || '规则说明' }}</h2>
-      <ol>
+    <section v-else-if="panel === 'rules'" class="panel sheet-page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">誓约条文</p>
+          <h2>{{ rules.title || '规则说明' }}</h2>
+        </div>
+      </div>
+      <p>四家花色只是旧日的名字。比大小时花色不作数，先得到三分的人离开牌桌。</p>
+      <ul class="houses houses-inline">
+        <li><b>♠</b>黑棘</li>
+        <li><b class="hot">♥</b>赤焰</li>
+        <li><b class="hot">♦</b>星晶</li>
+        <li><b>♣</b>森誓</li>
+      </ul>
+      <ol class="rules">
         <li v-for="(line, index) in rules.lines" :key="index">{{ line }}</li>
       </ol>
     </section>
 
-    <section v-else-if="panel === 'history'" class="panel">
-      <h2>历史记录</h2>
-      <p v-if="history.length === 0">还没有打完的对局。</p>
-      <table v-else>
-        <thead>
-          <tr><th>时间</th><th>对手</th><th>方式</th><th>比分</th><th>结果</th><th>原因</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in history" :key="row.id">
-            <td>{{ row.created_at }}</td>
-            <td>{{ row.opponent_name }}</td>
-            <td>{{ row.mode }}</td>
-            <td>{{ row.my_score }} : {{ row.opp_score }}</td>
-            <td>{{ row.result }}</td>
-            <td>{{ row.reason }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <section v-else-if="panel === 'history'" class="panel sheet-page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">最近 20 局</p>
+          <h2>历史记录</h2>
+        </div>
+      </div>
+      <p v-if="history.length === 0" class="empty-copy">还没有打完的对局。</p>
+      <div v-else class="history">
+        <article v-for="row in history" :key="row.id">
+          <div>
+            <b>{{ loreName(row.opponent_name) }}</b>
+            <span>{{ row.created_at }} · {{ row.mode }}</span>
+          </div>
+          <div class="score-pair">{{ row.my_score }} : {{ row.opp_score }}</div>
+          <em :class="row.result === '胜' ? 'good' : 'bad'">{{ row.result }}</em>
+          <p>{{ loreLine(row.reason) }}</p>
+        </article>
+      </div>
     </section>
 
-    <section v-else-if="panel === 'match'" class="panel">
-      <h2>房间匹配</h2>
+    <section v-else-if="panel === 'match'" class="panel sheet-page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">两位玩家</p>
+          <h2>房间匹配</h2>
+        </div>
+      </div>
       <p>两位已登录的玩家会配到同一局。只有一个人时，会停在这里等待。</p>
-      <p v-if="waiting">正在等待另一位玩家… 可以用下面的按钮取消。</p>
+      <p class="wait" v-if="waiting">正在等待另一位玩家…</p>
       <button type="button" class="ghost" :disabled="!waiting" @click="cancelMatch">取消等待</button>
     </section>
 
     <section v-else class="panel table-panel">
-      <h2>牌桌</h2>
-      <p v-if="!game">点「开始游戏」对战电脑，或点「房间匹配」找一位玩家。</p>
+      <div v-if="!game" class="empty-table">
+        <p class="kicker">空的圆台</p>
+        <h2>灰烬看守还在等你落座。</h2>
+        <p>点「开始游戏」进入人机圣约，或点「房间匹配」找另一位旅人。</p>
+      </div>
       <template v-else>
-        <div class="scorebar">
+        <div class="table-layout">
           <div>
-            <b>{{ game.opponent.name }}</b>
-            <span>{{ game.opponent.score }} 分</span>
-            <span>手牌 {{ game.opponent.hand_count }}</span>
-            <span>牌组 {{ game.opponent.deck_left }}</span>
-          </div>
-          <div class="target">
-            {{ game.mode === 'solo' ? '单机' : '匹配' }} · 第 {{ game.round_no }} 回合 · 先到 {{ game.target_score }} 分
-          </div>
-          <div>
-            <b>{{ game.you.name }}</b>
-            <span>{{ game.you.score }} 分</span>
-            <span>手牌 {{ game.you.hand.length }}</span>
-            <span>牌组 {{ game.you.deck_left }}</span>
-          </div>
-        </div>
-
-        <div class="felt">
-          <div class="side">
-            <span>{{ game.opponent.name }}</span>
-            <div class="backs">
-              <i v-for="n in game.opponent.hand_count" :key="n"></i>
-            </div>
-          </div>
-          <div class="center">
-            <p>{{ board.caption }}</p>
-            <div class="played">
-              <div>
-                <em>对手</em>
-                <div v-if="board.opponent" class="pcard" :class="{ red: isRed(board.opponent) }">
-                  <span>{{ rankOf(board.opponent) }}</span><b>{{ suitSymbol(board.opponent[0]) }}</b>
-                </div>
-                <div v-else class="pcard empty">未出</div>
+            <div class="scorebar">
+              <div class="seat-meta">
+                <b>{{ loreName(game.opponent.name) }}</b>
+                <span class="pips" :aria-label="game.opponent.score + ' 分'">
+                  <i v-for="n in game.target_score" :key="'o' + n" :class="{ fill: n <= game.opponent.score }"></i>
+                </span>
+                <span>手牌 {{ game.opponent.hand_count }} · 牌组 {{ game.opponent.deck_left }}</span>
               </div>
-              <div>
-                <em>你</em>
-                <div v-if="board.you" class="pcard" :class="{ red: isRed(board.you) }">
-                  <span>{{ rankOf(board.you) }}</span><b>{{ suitSymbol(board.you[0]) }}</b>
-                </div>
-                <div v-else class="pcard empty">未出</div>
+              <div class="target">
+                {{ game.mode === 'solo' ? '单机' : '匹配' }} · 第 {{ game.round_no }} 回合 · 先到 {{ game.target_score }} 分
+              </div>
+              <div class="seat-meta you">
+                <b>{{ loreName(game.you.name) }}</b>
+                <span class="pips" :aria-label="game.you.score + ' 分'">
+                  <i v-for="n in game.target_score" :key="'y' + n" :class="{ fill: n <= game.you.score }"></i>
+                </span>
+                <span>手牌 {{ game.you.hand.length }} · 牌组 {{ game.you.deck_left }}</span>
               </div>
             </div>
+
+            <div class="felt">
+              <div class="side">
+                <span>{{ loreName(game.opponent.name) }}</span>
+                <div class="backs">
+                  <i v-for="n in game.opponent.hand_count" :key="n"></i>
+                </div>
+              </div>
+              <div class="center">
+                <p>{{ board.caption }}</p>
+                <div class="played">
+                  <div>
+                    <em>对手</em>
+                    <div v-if="board.opponent" class="card lg" :class="{ red: isRed(board.opponent) }">
+                      <span class="corner"><b>{{ rankOf(board.opponent) }}</b><i>{{ suitSymbol(board.opponent[0]) }}</i></span>
+                      <span class="pip" aria-hidden="true">{{ suitSymbol(board.opponent[0]) }}</span>
+                    </div>
+                    <div v-else class="card lg empty">未出</div>
+                  </div>
+                  <div>
+                    <em>你</em>
+                    <div v-if="board.you" class="card lg" :class="{ red: isRed(board.you) }">
+                      <span class="corner"><b>{{ rankOf(board.you) }}</b><i>{{ suitSymbol(board.you[0]) }}</i></span>
+                      <span class="pip" aria-hidden="true">{{ suitSymbol(board.you[0]) }}</span>
+                    </div>
+                    <div v-else class="card lg empty">未出</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="banner win" v-if="game.status === 'finished' && game.winner === 'you'">你赢了。{{ game.reason }}</p>
+            <p class="banner lose" v-if="game.status === 'finished' && game.winner === 'opponent'">你输了。{{ game.reason }}</p>
+            <p class="turn live" v-else-if="game.you.is_turn">轮到你：可以先抓一张，再点手牌打出。</p>
+            <p class="turn" v-else>等待对手出牌。胜负由服务器判定。</p>
+
+            <div class="hand">
+              <button
+                v-for="card in sortedHand"
+                :key="card"
+                type="button"
+                class="card"
+                :class="{ red: isRed(card) }"
+                :disabled="!game.you.is_turn || game.status !== 'playing'"
+                @click="playCard(card)"
+              >
+                <span class="corner"><b>{{ rankOf(card) }}</b><i>{{ suitSymbol(card[0]) }}</i></span>
+                <span class="pip" aria-hidden="true">{{ suitSymbol(card[0]) }}</span>
+              </button>
+            </div>
+            <button type="button" class="solid" :disabled="!canDraw" @click="drawCard">从自己的牌组抓一张</button>
           </div>
+          <aside class="log-card">
+            <h2>对局记录</h2>
+            <ol class="log">
+              <li v-for="(line, index) in game.log" :key="index">{{ loreLine(line) }}</li>
+            </ol>
+          </aside>
         </div>
-
-        <p class="banner win" v-if="game.status === 'finished' && game.winner === 'you'">你赢了。{{ game.reason }}</p>
-        <p class="banner lose" v-if="game.status === 'finished' && game.winner === 'opponent'">你输了。{{ game.reason }}</p>
-        <p class="turn" v-else-if="game.you.is_turn">轮到你：可以先抓一张，再点手牌打出。</p>
-        <p class="turn" v-else>等待对手出牌。胜负由服务器判定。</p>
-
-        <div class="hand">
-          <button
-            v-for="card in sortedHand"
-            :key="card"
-            type="button"
-            class="pcard"
-            :class="{ red: isRed(card) }"
-            :disabled="!game.you.is_turn || game.status !== 'playing'"
-            @click="playCard(card)"
-          >
-            <span>{{ rankOf(card) }}</span>
-            <b>{{ suitSymbol(card[0]) }}</b>
-          </button>
-        </div>
-        <button type="button" :disabled="!canDraw" @click="drawCard">从自己的牌组抓一张</button>
-        <ul class="log">
-          <li v-for="(line, index) in game.log" :key="index">{{ line }}</li>
-        </ul>
       </template>
     </section>
   </div>
