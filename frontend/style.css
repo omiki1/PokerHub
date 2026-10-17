@@ -1,0 +1,192 @@
+:root {
+  --felt: #1f4d3a;
+  --felt-deep: #143528;
+  --paper: #f4efe4;
+  --ink: #241c15;
+  --amber: #9a5412;
+  --line: #ddcbb4;
+  --win: #1f6b45;
+  --lose: #8d2f39;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top, #2f6a50 0, var(--felt) 42%, var(--felt-deep) 100%);
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
+
+#app {
+  width: min(1080px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 22px 0 40px;
+}
+
+[v-cloak] { display: none; }
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  color: #f6f1e7;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+h1, h2 { margin: 0; font-weight: 650; }
+h1 { font-size: 32px; }
+.who { margin: 0; }
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(0.97); }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+button.danger { background: #f3d7d4; }
+button.ghost { background: transparent; border: 1px solid var(--line); }
+button.on { outline: 2px solid var(--amber); }
+
+.note {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff8ea;
+}
+
+.note.bad { background: #fde8e6; }
+
+.panel {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+}
+
+.panel p { line-height: 1.55; }
+.switch { display: flex; gap: 8px; margin-bottom: 12px; }
+
+form {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+}
+
+label { display: grid; gap: 4px; font-size: 14px; }
+
+input {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.stat { font-weight: 650; }
+
+.catalog, .hand, .backs, .played {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mini, .pcard {
+  width: 58px;
+  height: 80px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e7d7c3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.mini span, .pcard span { font-size: 18px; font-weight: 700; }
+.mini em, .pcard b { font-style: normal; font-size: 20px; }
+.mini.on { outline: 3px solid var(--amber); }
+.red { color: #a12632; }
+
+.scorebar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.scorebar div:not(.target) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.target { color: var(--amber); font-weight: 650; }
+
+.felt {
+  background: var(--felt);
+  color: #f6f1e7;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.backs i {
+  width: 36px;
+  height: 50px;
+  border-radius: 6px;
+  background: repeating-linear-gradient(45deg, #245c44, #245c44 4px, #317455 4px, #317455 8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.center { text-align: center; }
+.played { justify-content: center; margin-top: 8px; }
+.played em { display: block; font-style: normal; font-size: 12px; margin-bottom: 4px; }
+.pcard.empty {
+  color: rgba(255, 255, 255, 0.75);
+  background: transparent;
+  border-style: dashed;
+}
+
+.turn { font-weight: 650; }
+.banner { padding: 10px 12px; border-radius: 8px; color: white; }
+.banner.win { background: var(--win); }
+.banner.lose { background: var(--lose); }
+
+.log {
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 18px;
+  color: #5c5148;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+
+@media (max-width: 720px) {
+  .actions { grid-template-columns: repeat(2, 1fr); }
+  .top, .scorebar { flex-direction: column; align-items: start; }
+  h1 { font-size: 26px; }
+}
