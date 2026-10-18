@@ -8,6 +8,117 @@ const DDZ_POINT = { J: 11, Q: 12, K: 13, A: 14, "2": 15, BJ: 16, RJ: 17 };
 
 const { createApp } = Vue;
 
+// 音效用浏览器合成，不另外放音频文件。第一次点击后才能出声。
+const Sfx = {
+  ctx: null,
+  muted: localStorage.getItem("pokerhub_mute") === "1",
+  ensure() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx || this.muted) return null;
+    if (!this.ctx) this.ctx = new Ctx();
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    return this.ctx;
+  },
+  tone(freq, dur, type, gain, glide) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const amp = ctx.createGain();
+    osc.type = type || "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    if (glide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, glide), t + dur);
+    amp.gain.setValueAtTime(0.0001, t);
+    amp.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(amp);
+    amp.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  },
+  noise(dur, gain) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const length = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 700;
+    const amp = ctx.createGain();
+    amp.gain.value = gain;
+    src.connect(filter);
+    filter.connect(amp);
+    amp.connect(ctx.destination);
+    src.start();
+  },
+  play(name) {
+    if (!this.ensure()) return;
+    if (name === "card") {
+      this.noise(0.07, 0.32);
+      this.tone(620, 0.05, "triangle", 0.05);
+    } else if (name === "deal") {
+      this.noise(0.05, 0.2);
+      setTimeout(() => this.play("tick"), 80);
+      setTimeout(() => this.play("tick"), 150);
+    } else if (name === "tick") {
+      if (!this.ensure()) return;
+      this.noise(0.04, 0.16);
+    } else if (name === "pass") {
+      this.tone(170, 0.14, "sine", 0.07, 80);
+    } else if (name === "bid") {
+      this.tone(523, 0.08, "sine", 0.06);
+      setTimeout(() => {
+        if (this.ensure()) this.tone(784, 0.12, "sine", 0.05);
+      }, 90);
+    } else if (name === "reveal") {
+      this.tone(146, 0.42, "sawtooth", 0.035, 90);
+      this.tone(220, 0.32, "triangle", 0.05);
+    } else if (name === "turn") {
+      this.tone(880, 0.09, "sine", 0.045);
+    } else if (name === "win") {
+      [523, 659, 784, 1046].forEach((freq, index) => {
+        setTimeout(() => {
+          if (this.ensure()) this.tone(freq, 0.16, "triangle", 0.06);
+        }, index * 110);
+      });
+    } else if (name === "lose") {
+      [392, 330, 247].forEach((freq, index) => {
+        setTimeout(() => {
+          if (this.ensure()) this.tone(freq, 0.18, "sine", 0.055);
+        }, index * 130);
+      });
+    } else if (name === "point") {
+      this.tone(988, 0.08, "sine", 0.045);
+    }
+  },
+};
+
+function freshLines(prev, next) {
+  const before = prev || [];
+  const after = next || [];
+  if (after.length >= before.length && before.every((line, index) => line === after[index])) {
+    return after.slice(before.length);
+  }
+  return after.length ? [after[after.length - 1]] : [];
+}
+
+function soundFor(lines) {
+  const text = lines.join("\n");
+  if (!text) return "";
+  if (text.includes("化为狼人") || text.includes("当地主")) return "reveal";
+  if (text.includes("出了") || text.includes("打出")) return "card";
+  if (text.includes("不叫") || text.includes("不出")) return "pass";
+  if (text.includes("叫")) return "bid";
+  if (text.includes("重新发牌") || text.includes("对局开始") || text.includes("发牌结束")) return "deal";
+  if (text.includes("抓了")) return "tick";
+  if (text.includes("得 1 分") || text.includes("平局")) return "point";
+  return "";
+}
+
 createApp({
   data() {
     return {
@@ -37,6 +148,7 @@ createApp({
       ddzHintIndex: 0,
       ddzTimer: null,
       rematchWaiting: false,
+      muted: Sfx.muted,
     };
   },
 
@@ -94,11 +206,16 @@ createApp({
   async mounted() {
     this.token = localStorage.getItem("pokerhub_token") || "";
     await this.loadRules();
+    this.syncPlayChrome();
     if (!this.token) return;
     await this.loadMe();
     if (!this.user) return;
     this.panel = "profile";
     this.connect().catch(() => {});
+  },
+
+  updated() {
+    this.syncPlayChrome();
   },
 
   methods: {
@@ -344,17 +461,21 @@ createApp({
     },
 
     applyState(state) {
+      const prev = this.game;
       this.waiting = false;
       this.game = state;
       this.panel = "game";
       this.message = "";
       this.rematchWaiting = false;
       if (state.status === "finished" && this.user) this.loadHistory();
+      this.cueTable(prev, state, "poker");
+      this.syncPlayChrome();
     },
 
     // ----- 斗地主 -----
 
     applyDdz(state, focus = true) {
+      const prev = this.ddz;
       this.waiting = false;
       this.ddz = state;
       // focus 为 false 时不抢界面：免登录局的机器人是网页自己在催，
@@ -368,7 +489,9 @@ createApp({
       this.ddzHintIndex = 0;
       if (state.phase !== "playing" || !state.you.is_turn) this.ddzSelection = [];
       if (state.phase === "finished" && this.user) this.loadHistory();
+      this.cueTable(prev, state, "ddz");
       this.scheduleDdzAdvance();
+      this.syncPlayChrome();
     },
 
     stopDdzTimer() {
@@ -441,6 +564,12 @@ createApp({
     },
 
     async startDdzSolo() {
+      Sfx.ensure();
+      if (this.ddz && this.ddz.phase !== "finished" && this.ddz.mode === "solo") {
+        this.panel = "ddz";
+        this.message = "";
+        return;
+      }
       this.panel = "ddz";
       this.message = "";
       this.ddzSelection = [];
@@ -597,6 +726,13 @@ createApp({
     },
 
     async startSolo() {
+      Sfx.ensure();
+      if (this.game && this.game.status === "playing" && this.game.mode === "solo") {
+        this.panel = "game";
+        this.message = "";
+        this.syncPlayChrome();
+        return;
+      }
       this.panel = "game";
       this.message = "";
       try {
@@ -669,6 +805,68 @@ createApp({
       }
     },
 
+    leaveTable() {
+      this.panel = "login";
+      this.syncPlayChrome();
+    },
+    toggleMute() {
+      this.muted = !this.muted;
+      Sfx.muted = this.muted;
+      localStorage.setItem("pokerhub_mute", this.muted ? "1" : "0");
+      if (!this.muted) Sfx.play("tick");
+    },
+    cueTable(prev, next, kind) {
+      if (!prev) {
+        Sfx.play("deal");
+        return;
+      }
+      const finished = kind === "ddz"
+        ? prev.phase !== "finished" && next.phase === "finished"
+        : prev.status !== "finished" && next.status === "finished";
+      if (finished) {
+        const won = kind === "ddz" ? next.result && next.result.you_win : next.winner === "you";
+        Sfx.play(won ? "win" : "lose");
+        return;
+      }
+      const lines = freshLines(prev.log, next.log);
+      const sound = soundFor(lines);
+      const wasTurn = kind === "ddz"
+        ? prev.you.is_turn || prev.you.is_bid_turn
+        : prev.you.is_turn;
+      const nowTurn = kind === "ddz"
+        ? next.you.is_turn || next.you.is_bid_turn
+        : next.you.is_turn;
+      if (sound) Sfx.play(sound);
+      else if (nowTurn && !wasTurn) Sfx.play("turn");
+    },
+    syncPlayChrome() {
+      const wolf = this.panel === "ddz" && Boolean(this.ddz);
+      const poker = this.panel === "game" && Boolean(this.game);
+      document.body.classList.toggle("app-play", wolf || poker);
+      document.body.classList.toggle("app-wolf", wolf);
+      document.body.classList.toggle("app-poker", poker);
+    },
+    ddzRole(person) {
+      if (!this.ddz || this.ddz.phase === "bidding") return "未定";
+      return person.is_landlord ? "狼人" : "村民";
+    },
+    ddzPortraitClass(person) {
+      if (!this.ddz || this.ddz.phase === "bidding") return "hood";
+      return person.is_landlord ? "wolf" : "human";
+    },
+    ddzPortrait(person, slot) {
+      if (!this.ddz || this.ddz.phase === "bidding") return "/art/hood.jpg";
+      if (person.is_landlord) return "/art/werewolf.jpg";
+      if (slot === "right") return "/art/elder.jpg";
+      if (slot === "you") return "/art/villager.jpg";
+      return this.ddz.you.is_landlord ? "/art/villager.jpg" : "/art/elder.jpg";
+    },
+    ddzLore(line) {
+      return this.loreLine(line)
+        .replaceAll("当地主", "化为狼人")
+        .replaceAll("地主", "狼人")
+        .replaceAll("农民", "村民");
+    },
     loreName(name) {
       if (name === "电脑") return "灰烬看守";
       if (name === "游客") return "无名旅人";

@@ -35,12 +35,12 @@
       <button type="button" :class="{ on: panel === 'history' }" @click="openPanel('history')">历史记录</button>
       <button type="button" :class="{ on: panel === 'game' }" @click="startSolo">开始游戏</button>
       <button type="button" :class="{ on: panel === 'match' && waitGame === 'poker' }" @click="startMatch">房间匹配</button>
-      <button type="button" :class="{ on: panel === 'ddz' && ddzMode === 'solo' }" @click="startDdzSolo">斗地主人机</button>
+      <button type="button" :class="{ on: panel === 'ddz' && ddzMode === 'solo' }" @click="startDdzSolo">狼人夜</button>
       <button
         type="button"
         :class="{ on: (panel === 'match' && waitGame === 'ddz') || (panel === 'ddz' && ddzMode === 'match') }"
         @click="startDdzMatch"
-      >斗地主房间</button>
+      >狼人房间</button>
       <button type="button" class="danger" @click="surrender">投降</button>
     </nav>
 
@@ -58,7 +58,17 @@
           <li><b class="hot">♦</b>星晶</li>
           <li><b>♣</b>森誓</li>
         </ul>
-        <button type="button" class="solid" @click="startSolo">免登录，和电脑打一局</button>
+        <div class="modes">
+          <button type="button" class="mode-card" @click="startSolo">
+            <b>圣约比点</b>
+            <span>和灰烬看守比一张牌，先到三分</span>
+          </button>
+          <button type="button" class="mode-card wolf" @click="startDdzSolo">
+            <img src="/art/werewolf.jpg" alt="">
+            <b>狼人夜</b>
+            <span>三人斗地主。叫分最高的人化为狼人</span>
+          </button>
+        </div>
       </div>
       <div class="sheet">
         <h2>{{ authMode === 'login' ? '登录' : '注册' }}</h2>
@@ -124,12 +134,12 @@
       <div class="page-head">
         <div>
           <p class="kicker">誓约条文</p>
-          <h2>{{ rules.title || '规则说明' }}</h2>
+          <h2>{{ rulesGame === 'ddz' ? '狼人夜' : (rules.title || '规则说明') }}</h2>
         </div>
       </div>
       <div class="switch">
         <button type="button" :class="{ on: rulesGame === 'poker' }" @click="showRules('poker')">抽牌比点</button>
-        <button type="button" :class="{ on: rulesGame === 'ddz' }" @click="showRules('ddz')">斗地主</button>
+        <button type="button" :class="{ on: rulesGame === 'ddz' }" @click="showRules('ddz')">狼人夜</button>
       </div>
       <template v-if="rulesGame === 'poker'">
         <p>四家花色只是旧日的名字。比大小时花色不作数，先得到三分的人离开牌桌。</p>
@@ -140,9 +150,9 @@
           <li><b>♣</b>森誓</li>
         </ul>
       </template>
-      <p v-else>一副 54 张，三个人打。地主一个人一方，另外两个农民一方。</p>
+      <p v-else>叫分最高的人化为狼人，另外两人是村民。牌还是斗地主，先出完的那一方赢。</p>
       <ol class="rules">
-        <li v-for="(line, index) in rules.lines" :key="index">{{ line }}</li>
+        <li v-for="(line, index) in rules.lines" :key="index">{{ rulesGame === 'ddz' ? ddzLore(line) : line }}</li>
       </ol>
     </section>
 
@@ -157,13 +167,13 @@
       <div v-else class="history">
         <article v-for="row in history" :key="row.id">
           <div>
-            <b>{{ loreName(row.opponent_name) }}</b>
-            <span>{{ row.created_at }} · {{ row.mode }}</span>
+            <b>{{ row.game === 'ddz' ? ddzLore(row.opponent_name) : loreName(row.opponent_name) }}</b>
+            <span>{{ row.created_at }} · {{ row.game === 'ddz' ? (row.mode === 'ddz_match' ? '狼人房间' : '狼人夜') : row.mode }}</span>
           </div>
           <div class="score-pair" v-if="row.game === 'ddz'">{{ signed(row.my_score - row.opp_score) }} 分</div>
           <div class="score-pair" v-else>{{ row.my_score }} : {{ row.opp_score }}</div>
           <em :class="row.result === '胜' ? 'good' : 'bad'">{{ row.result }}</em>
-          <p>{{ loreLine(row.reason) }}</p>
+          <p>{{ row.game === 'ddz' ? ddzLore(row.reason) : loreLine(row.reason) }}</p>
         </article>
       </div>
     </section>
@@ -183,26 +193,41 @@
 
     <section v-else-if="panel === 'ddz'" class="panel table-panel">
       <div v-if="!ddz" class="empty-table">
-        <p class="kicker">三缺一</p>
-        <h2>斗地主还差人。</h2>
-        <p>点「斗地主人机」和两位看守打一局，或点「斗地主房间」等第三位旅人。</p>
+        <img class="empty-wolf" src="/art/werewolf.jpg" alt="">
+        <p class="kicker">满月</p>
+        <h2>月亮升起来了。</h2>
+        <p>点「狼人夜」和两位村民打一局。叫分最高的人会变成狼人。</p>
+        <button type="button" class="solid" @click="startDdzSolo">进入狼人夜</button>
       </div>
       <template v-else>
-        <div class="table-layout">
-          <div>
-            <div class="ddz-bar">
-              <div class="ddz-stat"><span>玩法</span><b>{{ ddz.mode === 'solo' ? '人机' : '匹配' }}</b></div>
-              <div class="ddz-stat"><span>底分</span><b>{{ ddz.base }}</b></div>
-              <div class="ddz-stat"><span>倍数</span><b>{{ ddz.multiplier }}</b></div>
-              <div class="ddz-stat"><span>炸弹</span><b>{{ ddz.bombs }}</b></div>
-              <div class="ddz-stat" :class="{ bright: !ddz.bottom_hidden }">
-                <span>底牌</span>
-                <span class="chips" v-if="!ddz.bottom_hidden">
-                  <i v-for="card in ddz.bottom" :key="card" class="chip sm" :class="{ red: ddzRed(card) }">{{ ddzRank(card) }}</i>
-                </span>
-                <b v-else>?</b>
+        <div class="ddz-stage">
+          <header class="play-bar">
+            <button type="button" class="play-back" @click="leaveTable">离开</button>
+            <div class="play-title">
+              <img src="/art/werewolf.jpg" alt="">
+              <div>
+                <p class="kicker">斗地主</p>
+                <strong>狼人夜</strong>
               </div>
             </div>
+            <div class="play-tools">
+              <button type="button" class="play-mute" @click="toggleMute">{{ muted ? "开声" : "静音" }}</button>
+              <button type="button" class="play-fold" @click="surrender">投降</button>
+            </div>
+          </header>
+
+          <div class="hud">
+            <div class="hud-chip"><span>底分</span><b>{{ ddz.base }}</b></div>
+            <div class="hud-chip"><span>倍数</span><b>{{ ddz.multiplier }}</b></div>
+            <div class="hud-chip"><span>炸弹</span><b>{{ ddz.bombs }}</b></div>
+            <div class="hud-chip" :class="{ bright: !ddz.bottom_hidden }">
+              <span>底牌</span>
+              <span class="chips" v-if="!ddz.bottom_hidden">
+                <i v-for="card in ddz.bottom" :key="card" class="chip sm" :class="{ red: ddzRed(card) }">{{ ddzRank(card) }}</i>
+              </span>
+              <b v-else>?</b>
+            </div>
+          </div>
 
             <div class="ddz-counter" aria-label="记牌器">
               <span class="ddz-counter-title">记牌器</span>
@@ -217,24 +242,25 @@
             </div>
 
             <div class="felt ddz-felt">
-              <div class="ddz-seats">
+              <div class="cast">
                 <article
                   v-for="rival in ddz.others"
                   :key="rival.seat"
-                  class="ddz-seat"
+                  class="cast-card"
                   :class="{
                     live: rival.is_turn || rival.is_bid_turn,
-                    landlord: rival.is_landlord,
+                    wolf: ddz.phase !== 'bidding' && rival.is_landlord,
                     thinking: ddz.bot_thinking && (rival.is_turn || rival.is_bid_turn),
                   }"
                 >
-                  <header>
+                  <img class="portrait" :class="ddzPortraitClass(rival)" :src="ddzPortrait(rival, rival.side)" alt="">
+                  <div class="cast-id">
                     <b>{{ loreName(rival.name) }}</b>
-                    <em>{{ rival.is_landlord ? '地主' : '农民' }}</em>
+                    <em class="role" :class="ddzPortraitClass(rival)">{{ ddzRole(rival) }}</em>
                     <span class="ddz-where">{{ rival.side === 'right' ? '下家' : '上家' }}</span>
-                  </header>
+                  </div>
                   <p class="ddz-meta">
-                    手牌 {{ rival.hand_count }} 张
+                    {{ rival.hand_count }} 张
                     <template v-if="rival.bid !== null"> · 叫 {{ rival.bid }} 分</template>
                   </p>
                   <div class="backs">
@@ -262,7 +288,7 @@
 
             <div class="result" v-if="ddz.phase === 'finished'">
               <p class="banner" :class="ddz.result.you_win ? 'win' : 'lose'">
-                {{ ddz.result.you_win ? '你赢了。' : '你输了。' }}{{ ddz.result.reason }}（{{ signed(ddz.result.score) }} 分）
+                {{ ddz.result.you_win ? '你赢了。' : '你输了。' }}{{ ddzLore(ddz.result.reason) }}（{{ signed(ddz.result.score) }} 分）
               </p>
               <div class="result-actions">
                 <button type="button" class="solid" :disabled="rematchWaiting" @click="rematchDdz">再来一局</button>
@@ -270,39 +296,15 @@
               </div>
             </div>
 
-            <div class="ddz-controls" v-if="ddz.phase === 'bidding'">
-              <p class="turn live" v-if="ddz.you.is_bid_turn">轮到你叫分。叫得最高的人当地主，叫到的分就是底分。</p>
-              <p class="turn" v-else>等待别的旅人叫分…</p>
-              <div class="ddz-buttons" v-if="ddz.you.is_bid_turn">
-                <button type="button" class="ghost" @click="ddzBid(0)">不叫</button>
-                <button
-                  v-for="n in 3"
-                  :key="n"
-                  type="button"
-                  class="solid"
-                  :disabled="n <= ddz.bid_high"
-                  @click="ddzBid(n)"
-                >{{ n }} 分</button>
+            <div class="you-dock">
+              <img class="portrait" :class="ddzPortraitClass(ddz.you)" :src="ddzPortrait(ddz.you, 'you')" alt="">
+              <div>
+                <b>{{ loreName(ddz.you.name) }}</b>
+                <em class="role" :class="ddzPortraitClass(ddz.you)">{{ ddzRole(ddz.you) }}</em>
+                <span>手牌 {{ ddz.you.hand_count }} 张</span>
+                <span v-if="ddz.you.bid !== null"> · 叫 {{ ddz.you.bid }} 分</span>
               </div>
             </div>
-
-            <div class="ddz-controls" v-else-if="ddz.phase === 'playing'">
-              <p class="turn live" v-if="ddz.you.is_turn">轮到你出牌。点手牌选牌，再点「出牌」。</p>
-              <p class="turn" v-else>等待别的旅人出牌。胜负由服务器判定。</p>
-              <div class="ddz-buttons">
-                <button type="button" class="solid" :disabled="!ddz.you.is_turn || !ddzSelection.length" @click="ddzPlay">出牌</button>
-                <button type="button" class="ghost" :disabled="!ddz.you.is_turn || !ddz.top" @click="ddzPass">不出</button>
-                <button type="button" class="ghost" :disabled="!ddz.you.is_turn" @click="ddzHint">提示</button>
-                <button type="button" class="ghost" :disabled="!ddzSelection.length" @click="ddzClear">清空</button>
-              </div>
-            </div>
-
-            <p class="ddz-mine">
-              <b>{{ loreName(ddz.you.name) }}</b>
-              <em :class="{ landlord: ddz.you.is_landlord }">{{ ddz.you.is_landlord ? '地主' : '农民' }}</em>
-              <span>手牌 {{ ddz.you.hand_count }} 张</span>
-              <span v-if="ddz.you.bid !== null"> · 叫 {{ ddz.you.bid }} 分</span>
-            </p>
             <div class="ddz-hand">
               <button
                 v-for="card in ddzHand"
@@ -317,14 +319,40 @@
                 <span class="pip" aria-hidden="true">{{ ddzSuit(card) }}</span>
               </button>
             </div>
-          </div>
 
-          <aside class="log-card">
-            <h2>对局记录</h2>
-            <ol class="log">
-              <li v-for="(line, index) in ddz.log" :key="index">{{ loreLine(line) }}</li>
-            </ol>
-          </aside>
+            <div class="dock" v-if="ddz.phase === 'bidding'">
+              <p class="turn live" v-if="ddz.you.is_bid_turn">轮到你叫分。最高的人化为狼人。</p>
+              <p class="turn" v-else>等人叫分。最高的人会变成狼人。</p>
+              <div class="dock-actions" v-if="ddz.you.is_bid_turn">
+                <button type="button" class="ghost" @click="ddzBid(0)">不叫</button>
+                <button
+                  v-for="n in 3"
+                  :key="n"
+                  type="button"
+                  class="solid"
+                  :disabled="n <= ddz.bid_high"
+                  @click="ddzBid(n)"
+                >{{ n }} 分</button>
+              </div>
+            </div>
+
+            <div class="dock" v-else-if="ddz.phase === 'playing'">
+              <p class="turn live" v-if="ddz.you.is_turn">轮到你。点牌，再按出牌。</p>
+              <p class="turn" v-else>等对面出牌。</p>
+              <div class="dock-actions">
+                <button type="button" class="solid" :disabled="!ddz.you.is_turn || !ddzSelection.length" @click="ddzPlay">出牌</button>
+                <button type="button" class="ghost" :disabled="!ddz.you.is_turn || !ddz.top" @click="ddzPass">不出</button>
+                <button type="button" class="ghost" :disabled="!ddz.you.is_turn" @click="ddzHint">提示</button>
+                <button type="button" class="ghost" :disabled="!ddzSelection.length" @click="ddzClear">清空</button>
+              </div>
+            </div>
+
+            <details class="play-log">
+              <summary>记录<span>{{ ddz.log.length ? ddzLore(ddz.log[ddz.log.length - 1]) : '' }}</span></summary>
+              <ol class="log">
+                <li v-for="(line, index) in ddz.log" :key="index">{{ ddzLore(line) }}</li>
+              </ol>
+            </details>
         </div>
       </template>
     </section>
@@ -336,29 +364,42 @@
         <p>点「开始游戏」进入人机圣约，或点「房间匹配」找另一位旅人。</p>
       </div>
       <template v-else>
-        <div class="table-layout">
-          <div>
-            <div class="scorebar">
-              <div class="seat-meta">
-                <b>{{ loreName(game.opponent.name) }}</b>
-                <span class="pips" :aria-label="game.opponent.score + ' 分'">
-                  <i v-for="n in game.target_score" :key="'o' + n" :class="{ fill: n <= game.opponent.score }"></i>
-                </span>
-                <span>手牌 {{ game.opponent.hand_count }} · 牌组 {{ game.opponent.deck_left }}</span>
-              </div>
-              <div class="target">
-                {{ game.mode === 'solo' ? '单机' : '匹配' }} · 第 {{ game.round_no }} 回合 · 先到 {{ game.target_score }} 分
-              </div>
-              <div class="seat-meta you">
-                <b>{{ loreName(game.you.name) }}</b>
-                <span class="pips" :aria-label="game.you.score + ' 分'">
-                  <i v-for="n in game.target_score" :key="'y' + n" :class="{ fill: n <= game.you.score }"></i>
-                </span>
-                <span>手牌 {{ game.you.hand.length }} · 牌组 {{ game.you.deck_left }}</span>
+        <div class="poker-stage">
+          <header class="play-bar">
+            <button type="button" class="play-back" @click="leaveTable">离开</button>
+            <div class="play-title">
+              <img src="/art/sigil.jpg" alt="">
+              <div>
+                <p class="kicker">灰烬圣约</p>
+                <strong>圣约比点</strong>
               </div>
             </div>
+            <div class="play-tools">
+              <button type="button" class="play-mute" @click="toggleMute">{{ muted ? "开声" : "静音" }}</button>
+              <button type="button" class="play-fold" @click="surrender">投降</button>
+            </div>
+          </header>
+          <div class="scorebar">
+            <div class="seat-meta">
+              <b>{{ loreName(game.opponent.name) }}</b>
+              <span class="pips" :aria-label="game.opponent.score + ' 分'">
+                <i v-for="n in game.target_score" :key="'o' + n" :class="{ fill: n <= game.opponent.score }"></i>
+              </span>
+              <span>手牌 {{ game.opponent.hand_count }} · 牌组 {{ game.opponent.deck_left }}</span>
+            </div>
+            <div class="target">
+              {{ game.mode === 'solo' ? '单机' : '匹配' }} · 第 {{ game.round_no }} 回合 · 先到 {{ game.target_score }} 分
+            </div>
+            <div class="seat-meta you">
+              <b>{{ loreName(game.you.name) }}</b>
+              <span class="pips" :aria-label="game.you.score + ' 分'">
+                <i v-for="n in game.target_score" :key="'y' + n" :class="{ fill: n <= game.you.score }"></i>
+              </span>
+              <span>手牌 {{ game.you.hand.length }} · 牌组 {{ game.you.deck_left }}</span>
+            </div>
+          </div>
 
-            <div class="felt">
+          <div class="felt">
               <div class="side">
                 <span>{{ loreName(game.opponent.name) }}</span>
                 <div class="backs">
@@ -400,28 +441,29 @@
             <p class="turn live" v-else-if="game.you.is_turn">轮到你：可以先抓一张，再点手牌打出。</p>
             <p class="turn" v-else>等待对手出牌。胜负由服务器判定。</p>
 
-            <div class="hand">
-              <button
-                v-for="card in sortedHand"
-                :key="card"
-                type="button"
-                class="card"
-                :class="{ red: isRed(card) }"
-                :disabled="!game.you.is_turn || game.status !== 'playing'"
-                @click="playCard(card)"
-              >
-                <span class="corner"><b>{{ rankOf(card) }}</b><i>{{ suitSymbol(card[0]) }}</i></span>
-                <span class="pip" aria-hidden="true">{{ suitSymbol(card[0]) }}</span>
-              </button>
-            </div>
-            <button type="button" class="solid" :disabled="!canDraw" @click="drawCard">从自己的牌组抓一张</button>
+          <div class="hand">
+            <button
+              v-for="card in sortedHand"
+              :key="card"
+              type="button"
+              class="card"
+              :class="{ red: isRed(card) }"
+              :disabled="!game.you.is_turn || game.status !== 'playing'"
+              @click="playCard(card)"
+            >
+              <span class="corner"><b>{{ rankOf(card) }}</b><i>{{ suitSymbol(card[0]) }}</i></span>
+              <span class="pip" aria-hidden="true">{{ suitSymbol(card[0]) }}</span>
+            </button>
           </div>
-          <aside class="log-card">
-            <h2>对局记录</h2>
+          <div class="dock">
+            <button type="button" class="solid" :disabled="!canDraw" @click="drawCard">抓一张</button>
+          </div>
+          <details class="play-log">
+            <summary>记录<span>{{ game.log.length ? loreLine(game.log[game.log.length - 1]) : '' }}</span></summary>
             <ol class="log">
               <li v-for="(line, index) in game.log" :key="index">{{ loreLine(line) }}</li>
             </ol>
-          </aside>
+          </details>
         </div>
       </template>
     </section>

@@ -69,6 +69,80 @@ button:focus-visible, input:focus-visible {
   margin: 0 auto;
   padding: 28px 0 56px;
 }
+body.app-play {
+  height: 100dvh;
+  overflow: hidden;
+  background-color: #07060c;
+  background-image:
+    linear-gradient(180deg, rgba(6, 4, 12, 0.2), rgba(6, 4, 12, 0.42)),
+    var(--table, url("/art/arena.jpg"));
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+body.app-poker { --table: url("/art/arena.jpg"); }
+body.app-wolf { --table: url("/art/wolf-night.jpg"); }
+body.app-play::before {
+  background: radial-gradient(ellipse at 50% 42%, transparent 18%, rgba(0, 0, 0, 0.5) 100%);
+}
+body.app-play #app {
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body.app-play .top,
+body.app-play .actions { display: none; }
+body.app-play .table-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+body.app-play .note {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  z-index: 4;
+  width: min(480px, calc(100% - 28px));
+  margin: 0;
+  transform: translateX(-50%);
+}
+body.app-play .ddz-stage,
+body.app-play .poker-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+body.app-play .felt,
+body.app-play .ddz-felt {
+  flex: 1;
+  min-height: 200px;
+  margin: 0;
+  background: radial-gradient(ellipse at 50% 46%, rgba(8, 6, 16, 0.05), rgba(4, 3, 10, 0.38) 78%);
+}
+body.app-play .hand,
+body.app-play .ddz-hand { justify-content: center; }
+body.app-play .scorebar,
+body.app-play .play-bar {
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: rgba(8, 10, 14, 0.55);
+  border: 1px solid rgba(228, 201, 138, 0.2);
+}
+body.app-play .play-bar { padding: 6px 8px; }
+body.app-play .poker-stage .dock .solid { min-width: 148px; }
 
 [v-cloak] { display: none; }
 
@@ -212,6 +286,34 @@ input {
 .solid:hover:not(:disabled) { filter: brightness(1.06); }
 .ghost { border: 1px solid var(--line); margin-top: 12px; color: var(--cream); }
 
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+.mode-card {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-height: 108px;
+  padding: 14px;
+  border-radius: 16px;
+  text-align: left;
+  border: 1px solid rgba(228, 201, 138, 0.35);
+  background: rgba(0, 0, 0, 0.28);
+}
+.mode-card img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e07060;
+}
+.mode-card b { font-size: 18px; }
+.mode-card span { font-size: 12px; line-height: 1.4; color: rgba(246, 240, 230, 0.75); }
+.mode-card.wolf { border-color: rgba(224, 112, 96, 0.75); }
+
 .stats { display: flex; gap: 12px; margin: 8px 0 18px; }
 .stats div {
   min-width: 96px;
@@ -239,41 +341,73 @@ input {
   width: 74px;
   height: 104px;
   border-radius: 10px;
-  background: linear-gradient(#fffaf3, #f3e7d4);
-  border: 1px solid #e4d3bf;
+  border: 1px solid #8d6a32;
   color: var(--ink);
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+  background-color: #f4ead8;
+  background-image: url("/art/cardface.jpg");
+  background-position: center;
+  background-size: 124% 124%;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 1px rgba(255, 236, 196, 0.35);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+/* 羊皮纤维来自 ambientCG Paper006（CC0），只铺在牌心，不盖住描金边。 */
+.card:not(.empty)::before {
+  content: "";
+  position: absolute;
+  inset: 18% 14%;
+  border-radius: 2px;
+  background: url("/art/paper.jpg") center / 180px repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.42;
+  pointer-events: none;
+  z-index: 0;
 }
 .card .corner {
   position: absolute;
-  top: 6px;
-  left: 7px;
+  top: 15%;
+  left: 13%;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 250, 243, 0.8);
 }
-.card .corner b { font-size: 16px; }
+.card .corner b {
+  font-family: Palatino, Georgia, "Times New Roman", serif;
+  font-size: 16px;
+}
 .card .corner i { font-style: normal; font-size: 13px; }
 .card .pip {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
+  font-family: Palatino, Georgia, "Times New Roman", serif;
   font-size: 28px;
+  text-shadow: 0 1px 0 rgba(255, 250, 243, 0.75);
 }
-.card.red { color: #a12632; }
+.card.red { color: #9d1e2c; }
 .card.mini { width: 100%; height: 96px; }
 .card.lg { width: 92px; height: 128px; }
 .card.lg .pip { font-size: 36px; }
-.card.on { box-shadow: 0 0 0 3px rgba(228, 201, 138, 0.85); }
+.card.on {
+  box-shadow:
+    0 0 0 2px #f0d7a2,
+    0 0 16px rgba(168, 96, 255, 0.45),
+    0 12px 18px rgba(0, 0, 0, 0.34);
+}
 .hand .card:hover:not(:disabled) { transform: translateY(-12px); }
 .card.empty {
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.72);
-  background: transparent;
-  border-style: dashed;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(8, 6, 14, 0.35);
+  border: 1px dashed rgba(228, 201, 138, 0.55);
   box-shadow: none;
 }
 
@@ -352,17 +486,50 @@ input {
 .pips i.fill { background: var(--gold); box-shadow: 0 0 8px rgba(228, 201, 138, 0.8); }
 
 .felt {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 300px;
   margin: 8px 0 14px;
   padding: 22px 18px 28px;
   border-radius: 28px;
   color: var(--cream);
   background:
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.08), transparent 46%),
-    linear-gradient(180deg, rgba(32, 122, 86, 0.92), rgba(11, 58, 42, 0.94));
+    radial-gradient(ellipse at 50% 46%, rgba(8, 6, 16, 0.05), rgba(6, 4, 12, 0.58) 78%),
+    url("/art/arena.jpg") center 38% / cover no-repeat;
   box-shadow:
-    inset 0 0 0 8px #6a431f,
-    inset 0 0 0 12px #3c2614,
-    inset 0 0 46px rgba(0, 0, 0, 0.25);
+    inset 0 0 0 2px rgba(240, 215, 162, 0.75),
+    inset 0 0 0 8px rgba(48, 28, 16, 0.88),
+    inset 0 0 70px rgba(48, 12, 82, 0.28);
+}
+.felt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 62%, rgba(150, 90, 255, 0.22), transparent 36%),
+    radial-gradient(ellipse at 50% 0%, rgba(120, 180, 255, 0.12), transparent 42%);
+  animation: aura 7s ease-in-out infinite;
+}
+.felt > * { position: relative; z-index: 1; }
+@keyframes aura {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.felt .side > span,
+.felt .center > p,
+.ddz-center > p {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+}
+.felt .center > p,
+.ddz-center > p {
+  display: inline-block;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(8, 6, 14, 0.62);
+  border: 1px solid rgba(228, 201, 138, 0.28);
 }
 .side, .backs, .hand, .played { display: flex; flex-wrap: wrap; gap: 8px; }
 .backs i {
@@ -465,7 +632,160 @@ input {
 .result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .result-actions span { font-size: 13px; color: rgba(246, 240, 230, 0.72); }
 
-.ddz-felt { display: grid; gap: 14px; }
+.ddz-felt {
+  display: grid;
+  gap: 14px;
+  min-height: 320px;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(8, 6, 16, 0.05), rgba(6, 4, 12, 0.55) 76%),
+    url("/art/wolf-night.jpg") center 22% / cover no-repeat;
+}
+.ddz-stage { display: grid; gap: 10px; }
+.empty-wolf {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e07060;
+  box-shadow: 0 0 22px rgba(180, 40, 30, 0.45);
+}
+.play-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.play-title { display: flex; align-items: center; gap: 10px; }
+.play-title img {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e07060;
+}
+.play-title .kicker { margin: 0; }
+.play-title strong {
+  font-family: Palatino, Georgia, serif;
+  font-size: 26px;
+  line-height: 1;
+}
+.play-tools { display: flex; gap: 8px; }
+.play-back, .play-fold, .play-mute {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(228, 201, 138, 0.35);
+  background: rgba(8, 10, 14, 0.78);
+}
+.play-mute { color: var(--gold); }
+.play-fold { color: #ffd0cc; border-color: rgba(255, 170, 160, 0.5); }
+.hud { display: flex; flex-wrap: wrap; gap: 8px; }
+.hud-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(8, 10, 14, 0.78);
+  border: 1px solid rgba(228, 201, 138, 0.28);
+}
+.hud-chip span { color: rgba(246, 240, 230, 0.72); font-size: 13px; }
+.hud-chip b { font-family: Palatino, Georgia, serif; font-size: 20px; }
+.hud-chip.bright { border-color: var(--gold); }
+.cast { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cast-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(228, 201, 138, 0.24);
+  background: rgba(6, 8, 14, 0.66);
+}
+.cast-card.live { border-color: var(--gold); }
+.cast-card.wolf { border-color: rgba(224, 112, 96, 0.85); }
+.cast-card.thinking { animation: thinking 1.3s ease-in-out infinite; }
+.cast-id { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cast-id b { font-size: 15px; }
+.cast-card .ddz-meta,
+.cast-card .backs,
+.cast-card .ddz-play,
+.cast-card .ddz-pass { grid-column: 1 / -1; }
+.cast-card .ddz-meta { margin: 0; }
+.portrait {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(228, 201, 138, 0.75);
+  background: #111;
+}
+.portrait.wolf {
+  border-color: #e07060;
+  box-shadow: 0 0 16px rgba(180, 40, 30, 0.65);
+}
+.portrait.human { border-color: #8fd0a8; }
+.portrait.hood { filter: saturate(0.85); }
+.role {
+  font-style: normal;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+}
+.role.wolf {
+  background: linear-gradient(180deg, #e07060, #8d2d28);
+  color: white;
+  border-color: transparent;
+  font-weight: 650;
+}
+.role.human {
+  background: linear-gradient(180deg, #e7f6ee, #7dbe98);
+  color: #1c2a22;
+  border-color: transparent;
+  font-weight: 650;
+}
+.you-dock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.you-dock .portrait { width: 64px; height: 64px; }
+.you-dock b { margin-right: 8px; }
+.you-dock span { font-size: 13px; color: rgba(246, 240, 230, 0.72); }
+.dock { margin-top: 4px; }
+.dock-actions {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: 8px;
+}
+.dock-actions .solid,
+.dock-actions .ghost {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  border-radius: 14px;
+  font-weight: 700;
+}
+.play-log {
+  border-radius: 16px;
+  background: rgba(8, 10, 14, 0.72);
+  border: 1px solid rgba(228, 201, 138, 0.22);
+  padding: 8px 12px 10px;
+}
+.play-log summary {
+  cursor: pointer;
+  color: var(--gold);
+  font-size: 13px;
+}
+.play-log summary span {
+  margin-left: 8px;
+  color: rgba(246, 240, 230, 0.72);
+}
+.play-log .log { max-height: 180px; margin-top: 8px; }
 .ddz-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .ddz-seat {
   padding: 12px 14px;
@@ -524,12 +844,16 @@ input {
   height: 42px;
   padding: 0 6px;
   border-radius: 7px;
-  background: linear-gradient(#fffaf3, #f3e7d4);
+  border: 1px solid #b8893e;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 243, 0.78), rgba(232, 214, 186, 0.88)),
+    url("/art/paper.jpg") center / 120px repeat;
   color: var(--ink);
+  font-family: Palatino, Georgia, "Times New Roman", serif;
   font-style: normal;
   font-size: 14px;
   font-weight: 650;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.32), inset 0 0 0 1px rgba(255, 244, 214, 0.45);
 }
 .chip.red { color: #a12632; }
 .chip.sm { min-width: 28px; height: 34px; font-size: 13px; }
@@ -591,7 +915,7 @@ input {
 
 @media (max-width: 980px) {
   .actions { grid-template-columns: repeat(4, 1fr); }
-  .lobby, .table-layout, .scorebar, .ddz-seats { grid-template-columns: 1fr; }
+  .lobby, .table-layout, .scorebar, .ddz-seats, .modes { grid-template-columns: 1fr; }
   .pitch h2, .empty-table h2 { font-size: 32px; }
   .seat-meta.you { align-items: flex-start; text-align: left; }
   .log { max-height: 220px; }
@@ -606,7 +930,11 @@ input {
   .actions { grid-template-columns: repeat(2, 1fr); }
   .history article { grid-template-columns: 1fr auto; }
   .history em { grid-column: 2; grid-row: 1; }
-  .ddz-hand .card.sm { width: 46px; height: 68px; margin-right: -20px; }
+  .ddz-hand .card.sm { width: 46px; height: 68px; margin-right: -18px; }
+  .portrait { width: 56px; height: 56px; }
+  .play-title strong { font-size: 20px; }
+  .dock-actions { grid-template-columns: 1fr 1fr; }
+  .cast { grid-template-columns: 1fr 1fr; }
   .ddz-hand .card.sm .corner b { font-size: 13px; }
   .ddz-hand .card.sm .pip { font-size: 18px; }
   .chip.lg { min-width: 34px; height: 46px; font-size: 15px; }
@@ -614,7 +942,9 @@ input {
 
 @media (prefers-reduced-motion: reduce) {
   .embers { display: none; }
+  .felt::after { animation: none; }
   .hand .card:hover:not(:disabled) { transform: none; }
   .ddz-seat.thinking { animation: none; }
   .ddz-hand .card.sm { transition: none; }
+  .card { transition: none; }
 }
